@@ -50,15 +50,15 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Setup Java 21 (Temurin)
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: ${{ env.JAVA_VERSION }}
@@ -74,7 +74,7 @@ jobs:
           fi
 
       - name: Cache npm and Gradle dependencies
-        uses: actions/cache@v6
+        uses: actions/cache@v4
         with:
           path: |
             ~/.npm
@@ -92,9 +92,11 @@ jobs:
             npm install --no-audit --no-fund
           fi
 
-      - name: Run TypeScript typecheck and Vite production build
+      - name: Run lint (if configured) and Vite production build
         run: |
-          npm run lint
+          if node -e "const p=require('./package.json'); process.exit(p.scripts && p.scripts.lint ? 0 : 1)"; then
+            npm run lint
+          fi
           npm run build
           test -f dist/index.html
 
@@ -109,6 +111,15 @@ jobs:
 
       - name: Generate and sync Android native project
         run: |
+          if [ ! -f "capacitor.config.json" ] && [ ! -f "capacitor.config.ts" ] && [ ! -f "capacitor.config.js" ]; then
+            cat <<EOF > capacitor.config.json
+          {
+            "appId": "${APP_ID}",
+            "appName": "${APP_NAME}",
+            "webDir": "dist"
+          }
+          EOF
+          fi
           if [ ! -d "android" ]; then
             npx cap add android
           fi
@@ -142,7 +153,6 @@ jobs:
               'org.gradle.caching': 'true',
               'org.gradle.daemon': 'false',
               'android.useAndroidX': 'true',
-              'android.enableJetifier': 'true',
           }
           prop_lines = [line for line in existing_props.splitlines() if line.strip()]
           prop_map = {}
@@ -167,7 +177,7 @@ jobs:
               gtxt = re.sub(r'versionName\s+"[^"]*"', f'versionName "{vname}"', gtxt)
               app_gradle.write_text(gtxt, encoding='utf-8')
 
-          # 3. Harden AndroidManifest.xml (Camera, Mic, Media, Hardware Acceleration, LargeHeap, Rotation Guard)
+          # 3. Harden AndroidManifest.xml
           ANDROID_NS = 'http://schemas.android.com/apk/res/android'
           ET.register_namespace('android', ANDROID_NS)
           tree = ET.parse(manifest_path)
@@ -224,7 +234,7 @@ jobs:
 
           tree.write(manifest_path, encoding='utf-8', xml_declaration=True)
 
-          # 4. Apply dark OLED theme (#090A0D) to prevent white flash on launch
+          # 4. Apply dark OLED colors (#090A0D) without duplicating ic_launcher_background
           values_dir = res_dir / 'values'
           values_dir.mkdir(parents=True, exist_ok=True)
           colors_xml = values_dir / 'colors.xml'
@@ -234,10 +244,12 @@ jobs:
               '    <color name="colorPrimary">#090A0D</color>\n'
               '    <color name="colorPrimaryDark">#090A0D</color>\n'
               '    <color name="colorAccent">#67E8F9</color>\n'
-              '    <color name="ic_launcher_background">#090A0D</color>\n'
               '</resources>\n',
               encoding='utf-8',
           )
+          dup_bg = values_dir / 'ic_launcher_background.xml'
+          if dup_bg.exists():
+              dup_bg.unlink()
 
           # 5. Generate Ultra Cam Pro launcher icons from public/ic_launcher.png if Pillow is installed
           src_icon = root / 'public' / 'ic_launcher.png'
@@ -267,7 +279,7 @@ jobs:
               except ImportError:
                   print('Pillow not installed; keeping default launcher icons.')
 
-          # 6. Harden MainActivity.java for zero-glitch WebView media/camera playback & dark surface
+          # 6. Harden MainActivity.java for WebView media/camera playback & dark surface
           java_root = app_dir / 'src' / 'main' / 'java'
           for main_act in java_root.rglob('MainActivity.java'):
               pkg_line = 'package com.ultracam.pro;'
@@ -407,7 +419,7 @@ jobs:
           ls -lh build-outputs/
 
       - name: Upload Signed Release & Debug APKs
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: UltraCamPro-APKs
           path: build-outputs/*.apk
