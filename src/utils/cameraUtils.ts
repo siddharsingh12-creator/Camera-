@@ -65,7 +65,20 @@ export function loadSavedPresets(): ProPreset[] {
     const raw = localStorage.getItem(PRESETS_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (p): p is ProPreset =>
+          Boolean(p) &&
+          typeof p === 'object' &&
+          typeof (p as ProPreset).id === 'string' &&
+          typeof (p as ProPreset).name === 'string'
+      )
+      .slice(-12)
+      .map((p) => ({
+        ...p,
+        name: p.name.replace(/[\u0000-\u001F\u007F]/g, '').slice(0, 48) || 'Custom Preset',
+      }));
   } catch {
     return [];
   }

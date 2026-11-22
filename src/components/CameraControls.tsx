@@ -5,8 +5,14 @@ import {
   Grid3X3,
   Image as ImageIcon,
   Layers,
+  Minus,
+  Palette,
   Play,
+  Plus,
   RefreshCw,
+  Settings,
+  SlidersHorizontal,
+  Sparkles,
   Timer,
   Zap,
   ZapOff,
@@ -19,6 +25,9 @@ import {
   CapturedPhotoInfo,
   FlashSetting,
   FocusPointState,
+  GridOverlayStyle,
+  HdrPlusMode,
+  HudAccentTheme,
   LENS_ROLE_META,
   PreviewAspectRatio,
   SHUTTER_TIMER_META,
@@ -262,6 +271,40 @@ export const QuickCapturePill: React.FC<{
   );
 };
 
+export const GCamEnginePill: React.FC<{
+  mode: HdrPlusMode;
+  sabreEnabled: boolean;
+  onClick: () => void;
+}> = ({ mode, sabreEnabled, onClick }) => {
+  const isOff = mode === 'OFF';
+  const isEnhanced = mode === 'HDR_PLUS_ENHANCED';
+  const label = isOff
+    ? 'HDR+ OFF'
+    : isEnhanced
+      ? sabreEnabled
+        ? 'HDR+ MAX'
+        : 'HDR+'
+      : 'HDR+ ZSL';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`GCam Pro Max Engine: ${label}`}
+      data-testid="gcam_engine_pill"
+      className={`flex shrink-0 cursor-pointer items-center gap-1 rounded-full border px-2.5 py-1.5 transition ${
+        isEnhanced
+          ? 'border-[#67E8F9]/85 bg-[#67E8F9]/18 text-[#67E8F9] hover:bg-[#67E8F9]/25'
+          : !isOff
+            ? 'border-[#34D399]/75 bg-[#34D399]/15 text-[#34D399] hover:bg-[#34D399]/22'
+            : 'border-white/15 bg-[#101218]/70 text-[#B4BAC6] hover:bg-[#1A1D26]'
+      }`}
+    >
+      <Sparkles className="h-3.5 w-3.5" />
+      <span className="font-mono-tech text-[10px] font-semibold whitespace-nowrap">{label}</span>
+    </button>
+  );
+};
+
 export const ProToggleButton: React.FC<{
   isOpen: boolean;
   hasAnyManualActive: boolean;
@@ -284,13 +327,74 @@ export const ProToggleButton: React.FC<{
   );
 };
 
+export const QuickSettingsButton: React.FC<{
+  isOpen: boolean;
+  onClick: () => void;
+}> = ({ isOpen, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-label="Toggle quick settings"
+    data-testid="quick_settings_button"
+    className={`flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border backdrop-blur-md transition duration-150 ${
+      isOpen
+        ? 'border-[#67E8F9] bg-[#67E8F9] text-[#090A0D]'
+        : 'border-white/15 bg-[#101218]/75 text-[#F6F7F9] hover:bg-[#1A1D26]'
+    }`}
+  >
+    <SlidersHorizontal className="h-[18px] w-[18px]" />
+  </button>
+);
+
+export const FilterToggleButton: React.FC<{
+  isOpen: boolean;
+  isFilterActive: boolean;
+  activeFilterLabel?: string;
+  onClick: () => void;
+}> = ({ isOpen, isFilterActive, activeFilterLabel, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-label={isFilterActive && activeFilterLabel ? `Filters (${activeFilterLabel})` : 'Real-time filters'}
+    data-testid="camera_filter_toggle_button"
+    className={`relative flex h-11 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full border backdrop-blur-md transition duration-150 ${
+      isFilterActive && activeFilterLabel ? 'px-3' : 'w-11'
+    } ${
+      isOpen
+        ? 'border-[#67E8F9] bg-[#67E8F9] text-[#090A0D]'
+        : isFilterActive
+          ? 'border-[#F59E0B]/80 bg-[#101218]/85 text-[#F59E0B] hover:bg-[#1A1D26]'
+          : 'border-white/15 bg-[#101218]/75 text-[#F6F7F9] hover:bg-[#1A1D26]'
+    }`}
+  >
+    <Palette className="h-[18px] w-[18px] shrink-0" />
+    {isFilterActive && activeFilterLabel && (
+      <span className="font-mono-tech text-[10px] font-semibold tracking-tight whitespace-nowrap">
+        {activeFilterLabel}
+      </span>
+    )}
+  </button>
+);
+
+export const SettingsGearButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-label="Open camera settings"
+    data-testid="camera_settings_button"
+    className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-[#101218]/75 text-[#F6F7F9] backdrop-blur-md transition duration-150 hover:bg-[#1A1D26]"
+  >
+    <Settings className="h-[18px] w-[18px]" />
+  </button>
+);
+
 export const HardwareInspectorButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
   <button
     type="button"
     onClick={onClick}
     aria-label="Inspect camera hardware capabilities"
     data-testid="hardware_inspector_button"
-    className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-[#101218]/70 text-[#67E8F9] transition hover:bg-[#1A1D26]"
+    className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-[#101218]/75 text-[#67E8F9] backdrop-blur-md transition duration-150 hover:bg-[#1A1D26]"
   >
     <Cpu className="h-[18px] w-[18px]" />
   </button>
@@ -305,11 +409,10 @@ export const SensorTelemetryPill: React.FC<{
     type="button"
     onClick={onClick}
     data-testid="sensor_telemetry_pill"
-    className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-white/15 bg-[#101218]/70 px-2.5 py-1.5 backdrop-blur-md transition hover:bg-[#1A1D26]"
+    className="flex min-h-[40px] shrink-0 cursor-pointer items-center gap-2 rounded-full border border-white/15 bg-[#101218]/75 px-3 py-1.5 backdrop-blur-md transition duration-150 hover:bg-[#1A1D26]"
   >
-    <span className="h-1.5 w-1.5 rounded-full bg-[#67E8F9]" />
-    <span className="font-mono-tech text-[10px] font-medium text-[#F6F7F9]">
-      {lensLabel} · {resolutionText}
+    <span className="font-mono-tech tabular-nums text-[10px] font-medium whitespace-nowrap text-[#F6F7F9]">
+      <span className="text-[#67E8F9]">{lensLabel}</span> · {resolutionText}
     </span>
   </button>
 );
@@ -318,35 +421,61 @@ export const ZoomSliderBar: React.FC<{
   currentZoom: number;
   minZoom: number;
   maxZoom: number;
+  accentTheme?: HudAccentTheme;
   onZoomChange: (zoom: number) => void;
-}> = ({ currentZoom, minZoom, maxZoom, onZoomChange }) => (
-  <div
-    data-testid="zoom_slider_bar"
-    className="flex w-full max-w-[360px] items-center gap-2.5 rounded-full border border-white/15 bg-[#101218]/70 px-3.5 py-1 backdrop-blur-md"
-  >
-    <span className="font-mono-tech w-10 text-[10px] font-medium text-[#67E8F9]">
-      {currentZoom.toFixed(1)}×
-    </span>
-    <input
-      type="range"
-      min={minZoom}
-      max={maxZoom}
-      step={0.1}
-      value={Math.min(maxZoom, Math.max(minZoom, currentZoom))}
-      onChange={(e) => onZoomChange(parseFloat(e.target.value))}
-      data-testid="zoom_slider"
-      className="ultra-slider h-5 flex-1 accent-[#67E8F9]"
-      style={{
-        background: `linear-gradient(to right, #67E8F9 0%, #67E8F9 ${((currentZoom - minZoom) / Math.max(0.01, maxZoom - minZoom)) * 100}%, rgba(255,255,255,0.15) ${((currentZoom - minZoom) / Math.max(0.01, maxZoom - minZoom)) * 100}%, rgba(255,255,255,0.15) 100%)`,
-        height: '4px',
-        borderRadius: '9999px',
-      }}
-    />
-    <span className="font-mono-tech text-[10px] font-medium text-[#B4BAC6]">
-      {maxZoom.toFixed(0)}×
-    </span>
-  </div>
-);
+}> = ({ currentZoom, minZoom, maxZoom, accentTheme = 'CYAN', onZoomChange }) => {
+  const accentHex =
+    accentTheme === 'AMBER' ? '#F59E0B' : accentTheme === 'TITANIUM' ? '#F6F7F9' : '#67E8F9';
+  const pct = ((currentZoom - minZoom) / Math.max(0.01, maxZoom - minZoom)) * 100;
+
+  return (
+    <div
+      data-testid="zoom_slider_bar"
+      className="flex w-full max-w-[380px] items-center gap-2 rounded-full border border-white/15 bg-[#101218]/78 px-2.5 py-1 backdrop-blur-md transition-opacity duration-200"
+    >
+      <button
+        type="button"
+        onClick={() => onZoomChange(Math.max(minZoom, Number((currentZoom - 0.2).toFixed(1))))}
+        aria-label="Zoom out"
+        className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-[#B4BAC6] transition hover:bg-white/10 hover:text-[#F6F7F9]"
+      >
+        <Minus className="h-3.5 w-3.5" />
+      </button>
+      <span
+        className="font-mono-tech tabular-nums w-9 shrink-0 text-center text-[11px] font-medium"
+        style={{ color: accentHex }}
+      >
+        {currentZoom.toFixed(1)}×
+      </span>
+      <input
+        type="range"
+        min={minZoom}
+        max={maxZoom}
+        step={0.05}
+        value={Math.min(maxZoom, Math.max(minZoom, currentZoom))}
+        onChange={(e) => onZoomChange(parseFloat(e.target.value))}
+        data-testid="zoom_slider"
+        className="ultra-slider h-5 flex-1"
+        style={{
+          background: `linear-gradient(to right, ${accentHex} 0%, ${accentHex} ${pct}%, rgba(255,255,255,0.16) ${pct}%, rgba(255,255,255,0.16) 100%)`,
+          height: '4px',
+          borderRadius: '9999px',
+        }}
+      />
+      <span className="font-mono-tech tabular-nums w-7 shrink-0 text-center text-[10px] font-medium text-[#B4BAC6]">
+        {maxZoom.toFixed(0)}×
+      </span>
+      <button
+        type="button"
+        onClick={() => onZoomChange(Math.min(maxZoom, Number((currentZoom + 0.2).toFixed(1))))}
+        aria-label="Zoom in"
+        className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-[#B4BAC6] transition hover:bg-white/10 hover:text-[#F6F7F9]"
+      >
+        <Plus className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+};
 
 export const DynamicLensSelectorBar: React.FC<{
   activeProfile: CameraHardwareProfile | null;
@@ -423,14 +552,73 @@ export const DynamicLensSelectorBar: React.FC<{
   );
 };
 
-export const RuleOfThirdsGrid: React.FC = () => (
-  <div className="pointer-events-none absolute inset-0">
-    <div className="absolute top-0 bottom-0 left-1/3 w-px bg-white/25" />
-    <div className="absolute top-0 bottom-0 left-2/3 w-px bg-white/25" />
-    <div className="absolute right-0 left-0 top-1/3 h-px bg-white/25" />
-    <div className="absolute right-0 left-0 top-2/3 h-px bg-white/25" />
-  </div>
-);
+export const CompositionGridOverlay: React.FC<{
+  style: GridOverlayStyle;
+  opacityPercent?: number;
+}> = ({ style, opacityPercent = 30 }) => {
+  if (style === 'OFF') return null;
+  const strokeColor = `rgba(255, 255, 255, ${Math.min(0.85, Math.max(0.1, opacityPercent / 100))})`;
+
+  if (style === 'GOLDEN_RATIO') {
+    return (
+      <svg
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+      >
+        <line x1="38.2" y1="0" x2="38.2" y2="100" stroke={strokeColor} strokeWidth="0.35" />
+        <line x1="61.8" y1="0" x2="61.8" y2="100" stroke={strokeColor} strokeWidth="0.35" />
+        <line x1="0" y1="38.2" x2="100" y2="38.2" stroke={strokeColor} strokeWidth="0.35" />
+        <line x1="0" y1="61.8" x2="100" y2="61.8" stroke={strokeColor} strokeWidth="0.35" />
+      </svg>
+    );
+  }
+
+  if (style === 'DIAGONAL') {
+    return (
+      <svg
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+      >
+        <line x1="0" y1="0" x2="100" y2="100" stroke={strokeColor} strokeWidth="0.35" />
+        <line x1="100" y1="0" x2="0" y2="100" stroke={strokeColor} strokeWidth="0.35" />
+      </svg>
+    );
+  }
+
+  if (style === 'SQUARE') {
+    return (
+      <svg
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+      >
+        {[25, 50, 75].map((pos) => (
+          <React.Fragment key={pos}>
+            <line x1={pos} y1="0" x2={pos} y2="100" stroke={strokeColor} strokeWidth="0.3" />
+            <line x1="0" y1={pos} x2="100" y2={pos} stroke={strokeColor} strokeWidth="0.3" />
+          </React.Fragment>
+        ))}
+      </svg>
+    );
+  }
+
+  return (
+    <svg
+      className="pointer-events-none absolute inset-0 h-full w-full"
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+    >
+      <line x1="33.33" y1="0" x2="33.33" y2="100" stroke={strokeColor} strokeWidth="0.35" />
+      <line x1="66.66" y1="0" x2="66.66" y2="100" stroke={strokeColor} strokeWidth="0.35" />
+      <line x1="0" y1="33.33" x2="100" y2="33.33" stroke={strokeColor} strokeWidth="0.35" />
+      <line x1="0" y1="66.66" x2="100" y2="66.66" stroke={strokeColor} strokeWidth="0.35" />
+    </svg>
+  );
+};
+
+export const RuleOfThirdsGrid: React.FC = () => <CompositionGridOverlay style="THIRDS" />;
 
 export const CameraLevelOverlay: React.FC<{ rollDegrees: number }> = ({ rollDegrees }) => {
   let nearest = 0;

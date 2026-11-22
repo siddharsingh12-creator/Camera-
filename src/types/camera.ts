@@ -1,3 +1,5 @@
+import { FilterId } from './filters';
+
 export type PreviewAspectRatio = 'RATIO_4_3' | 'RATIO_16_9' | 'RATIO_1_1' | 'FULL';
 
 export const ASPECT_RATIO_OPTIONS: { id: PreviewAspectRatio; label: string; ratioValue: number | null }[] = [
@@ -17,6 +19,17 @@ export const SHUTTER_TIMER_META: Record<ShutterTimer, { seconds: number; label: 
 };
 
 export type CaptureSpeedMode = 'MAX_QUALITY' | 'QUICK';
+
+export type HdrPlusMode = 'OFF' | 'HDR_PLUS_ZSL' | 'HDR_PLUS_ENHANCED';
+
+export interface GCamEngineSettings {
+  hdrPlusMode: HdrPlusMode;
+  topShotSelection: boolean;
+  sabreSuperRes: boolean;
+  pixelAwbEnabled: boolean;
+  chromaDenoiseEnabled: boolean;
+  f17PortraitDepth: boolean;
+}
 
 export type FlashSetting = 'OFF' | 'AUTO' | 'ON';
 
@@ -205,6 +218,25 @@ export interface SensorCapabilities {
   currentExposureIndex: number;
 }
 
+export interface MediaCaptureMetadata {
+  cameraLabel?: string;
+  lensLabel?: string;
+  iso?: number | null;
+  shutterSpeed?: string | null;
+  aperture?: number | null;
+  whiteBalance?: string;
+  mode?: string;
+  format?: string;
+  filterName?: string;
+  filterIntensity?: number;
+  isRawOriginal?: boolean;
+  computationalEngine?: string;
+  framesMerged?: number;
+  topShotSummary?: string;
+  hdrDynamicRange?: string;
+  awbCalibration?: string;
+}
+
 export interface CapturedPhotoInfo {
   id: string;
   url: string;
@@ -219,6 +251,43 @@ export interface CapturedPhotoInfo {
   mimeType: string;
   videoFrameRate: number | null;
   isHdrVideo: boolean;
+  isFavorite: boolean;
+  originalId?: string;
+  isEditedCopy?: boolean;
+  editSummary?: string;
+  captureMeta?: MediaCaptureMetadata;
+}
+
+export type GalleryFilterTab = 'RECENT' | 'PHOTOS' | 'VIDEOS' | 'FAVORITES';
+
+export type CropAspectPreset = 'ORIGINAL' | 'FREE' | '1:1' | '4:3' | '3:2' | '16:9' | '9:16';
+
+export interface NormalizedCropRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export type EditorToolCategory = 'ADJUST' | 'FILTERS' | 'CROP';
+
+export interface PhotoEditParams {
+  rotationQuarterTurns: number; // 0, 1, 2, 3 (each = 90deg CW)
+  straightenDeg: number; // -45 to +45
+  cropAspect: CropAspectPreset;
+  crop: NormalizedCropRect; // normalized 0..1 on rotated/straightened frame
+  filterId: FilterId;
+  filterIntensity: number; // 0 to 100
+  brightness: number; // -100 to +100
+  contrast: number; // -100 to +100
+  saturation: number; // -100 to +100
+  highlights: number; // -100 to +100
+  shadows: number; // -100 to +100
+  sharpness: number; // 0 to 100
+  temperature: number; // -100 to +100
+  tint: number; // -100 to +100
+  vignette: number; // -100 to +100
+  hdrPlusEnabled?: boolean;
 }
 
 export interface FocusPointState {
@@ -436,6 +505,68 @@ export interface VideoRecordingState {
   hasAudioTrack: boolean;
 }
 
+export type SaveImageQuality = 'MAXIMUM' | 'HIGH' | 'STANDARD' | 'PNG_LOSSLESS';
+
+export type DefaultLensPreference = 'BACK' | 'FRONT' | 'LAST_USED';
+
+export type DefaultCameraModePreference =
+  | 'STANDARD'
+  | 'HDR'
+  | 'NIGHT'
+  | 'PORTRAIT'
+  | 'VIDEO'
+  | 'PRO_MANUAL'
+  | 'LAST_USED';
+
+export type GridOverlayStyle = 'OFF' | 'THIRDS' | 'GOLDEN_RATIO' | 'DIAGONAL' | 'SQUARE';
+
+export type VolumeShutterAction = 'CAPTURE' | 'ZOOM' | 'OFF';
+
+export type AudioRecordingPreference = 'MICROPHONE' | 'HIGH_QUALITY_STEREO' | 'MUTE';
+
+export type SaveLocationPreference = 'IN_APP_GALLERY' | 'GALLERY_AND_DOWNLOAD';
+
+export type HudAccentTheme = 'CYAN' | 'AMBER' | 'TITANIUM';
+
+export interface UiCustomizationSettings {
+  showExposureMeterBar: boolean;
+  showZoomSlider: boolean;
+  showAspectRatioBar: boolean;
+  showCaptureFeatureStrip: boolean;
+  showTelemetryPill: boolean;
+  cleanViewfinderMode: boolean;
+  landscapeControlSide: 'RIGHT' | 'LEFT';
+  hudAccentTheme: HudAccentTheme;
+}
+
+export interface PrivacySettings {
+  stripMetadataOnSave: boolean;
+  privateSessionMode: boolean;
+  scopedPickerOnly: boolean;
+}
+
+export interface CameraUserPreferences {
+  saveImageQuality: SaveImageQuality;
+  defaultCameraLens: DefaultLensPreference;
+  defaultCameraMode: DefaultCameraModePreference;
+  gridStyle: GridOverlayStyle;
+  gridOpacityPercent: number;
+  defaultTimer: ShutterTimer;
+  timerAudioBeep: boolean;
+  defaultFlash: FlashSetting;
+  frontScreenFlash: boolean;
+  mirrorSelfie: boolean;
+  volumeShutterAction: VolumeShutterAction;
+  defaultVideoQuality: VideoQualityOption;
+  defaultVideoFps: VideoFpsOption;
+  audioRecordingPref: AudioRecordingPreference;
+  saveLocation: SaveLocationPreference;
+  fileNamePrefix: string;
+  gcamEngine: GCamEngineSettings;
+  uiCustomization: UiCustomizationSettings;
+  privacy: PrivacySettings;
+}
+
 export interface CameraUiState {
   permissionStatus: CameraPermissionStatus;
   isVirtualSensor: boolean;
@@ -472,6 +603,8 @@ export interface CameraUiState {
   videoSettings: VideoSettings;
   videoRecordingState: VideoRecordingState;
   isVideoSettingsOpen: boolean;
+  isQuickSettingsOpen: boolean;
+  isSettingsOpen: boolean;
   isHardwareInspectorOpen: boolean;
   inspectorSelectedCameraId: string | null;
   capturedMedia: CapturedPhotoInfo[];
@@ -479,6 +612,15 @@ export interface CameraUiState {
   inspectedPhoto: CapturedPhotoInfo | null;
   isPhotoViewerOpen: boolean;
   isGallerySheetOpen: boolean;
+  isPhotoEditorOpen: boolean;
+  editorTargetPhoto: CapturedPhotoInfo | null;
+  isVideoEditorOpen: boolean;
+  videoEditorTarget: CapturedPhotoInfo | null;
+  activeFilterId: FilterId;
+  filterIntensity: number;
+  favoriteFilterIds: FilterId[];
+  isFilterPanelOpen: boolean;
+  preserveOriginalOnFilteredCapture: boolean;
   focusPoint: FocusPointState | null;
   statusBanner: string | null;
   errorMessage: string | null;

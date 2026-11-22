@@ -1,19 +1,25 @@
 import React from 'react';
-import { Camera, Layers, Sparkles, Image as ImageIcon, MonitorPlay } from 'lucide-react';
+import { Camera, Layers, Sparkles, Image as ImageIcon, MonitorPlay, Settings } from 'lucide-react';
 import { CameraPermissionStatus } from '../types/camera';
 
 interface PermissionWelcomeScreenProps {
   permissionStatus: CameraPermissionStatus;
   errorMessage?: string | null;
+  galleryCount?: number;
   onOpenCameraClick: () => void;
   onUseVirtualSensorClick: () => void;
+  onOpenGalleryClick: () => void;
+  onOpenSettingsClick: () => void;
 }
 
 export const PermissionWelcomeScreen: React.FC<PermissionWelcomeScreenProps> = ({
   permissionStatus,
   errorMessage,
+  galleryCount = 0,
   onOpenCameraClick,
   onUseVirtualSensorClick,
+  onOpenGalleryClick,
+  onOpenSettingsClick,
 }) => {
   const showDeniedNotice =
     permissionStatus === 'DENIED' ||
@@ -107,6 +113,30 @@ export const PermissionWelcomeScreen: React.FC<PermissionWelcomeScreenProps> = (
             <span>Launch Virtual Optical Sensor</span>
           </button>
         )}
+
+        <div className="flex w-full gap-2.5">
+          <button
+            type="button"
+            onClick={onOpenGalleryClick}
+            data-testid="welcome_open_gallery_button"
+            className="font-display flex h-[50px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-full border border-white/15 bg-[#12141A] px-4 text-[13px] font-semibold text-[#F6F7F9] transition hover:bg-[#1A1D26]"
+          >
+            <ImageIcon className="h-[18px] w-[18px] text-[#67E8F9]" />
+            <span>
+              Gallery &amp; Editor{galleryCount > 0 ? ` (${galleryCount})` : ''}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenSettingsClick}
+            data-testid="welcome_open_settings_button"
+            className="font-display flex h-[50px] shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full border border-white/15 bg-[#12141A] px-5 text-[13px] font-semibold text-[#B4BAC6] transition hover:bg-[#1A1D26] hover:text-[#F6F7F9]"
+          >
+            <Settings className="h-[18px] w-[18px]" />
+            <span>Settings</span>
+          </button>
+        </div>
       </div>
     </div>
   );

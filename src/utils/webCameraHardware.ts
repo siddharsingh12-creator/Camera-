@@ -229,7 +229,7 @@ export async function scanBrowserCameraInventory(
 
       const zoomCap = caps.zoom as { min?: number; max?: number } | undefined;
       const minZoom = typeof zoomCap?.min === 'number' ? zoomCap.min : 1.0;
-      const maxZoom = typeof zoomCap?.max === 'number' ? Math.max(zoomCap.max, 4.0) : 6.0;
+      const maxZoom = typeof zoomCap?.max === 'number' ? zoomCap.max : 6.0;
 
       const isoCap = caps.iso as { min?: number; max?: number } | undefined;
       const expTimeCap = caps.exposureTime as { min?: number; max?: number } | undefined;
@@ -514,6 +514,17 @@ export function buildViewfinderFilterCss(
     blurPx = 0.4;
   }
 
+  if (
+    Math.abs(brightness - 1) < 0.005 &&
+    Math.abs(contrast - 1) < 0.005 &&
+    Math.abs(saturate - 1) < 0.005 &&
+    sepia === 0 &&
+    hueRotate === 0 &&
+    blurPx === 0
+  ) {
+    return 'none';
+  }
+
   return `brightness(${brightness.toFixed(2)}) contrast(${contrast.toFixed(2)}) saturate(${saturate.toFixed(2)}) sepia(${sepia.toFixed(2)}) hue-rotate(${hueRotate.toFixed(1)}deg) blur(${blurPx}px)`;
 }
 
@@ -662,11 +673,18 @@ export async function stitchPanoramaSlices(slices: HTMLCanvasElement[]): Promise
         tCtx.fillRect(overlap, 0, sliceW - overlap, sliceH);
         ctx.drawImage(temp, destX, 0);
       }
+      temp.width = 0;
+      temp.height = 0;
     }
   });
 
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    out.toBlob((b) => (b ? resolve(b) : reject(new Error('Failed to encode stitched panorama'))), 'image/jpeg', 0.94);
-  });
-  return { blob, width: totalW, height: sliceH };
+  try {
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      out.toBlob((b) => (b ? resolve(b) : reject(new Error('Failed to encode stitched panorama'))), 'image/jpeg', 0.94);
+    });
+    return { blob, width: totalW, height: sliceH };
+  } finally {
+    out.width = 0;
+    out.height = 0;
+  }
 }

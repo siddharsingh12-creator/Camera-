@@ -99,3 +99,14 @@ input[type='range'].ultra-slider::-webkit-slider-thumb {
 input[type='range'].ultra-slider-amber::-webkit-slider-thumb {
   background: #F59E0B;
 }
+
+@keyframes fadeSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
