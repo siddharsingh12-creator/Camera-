@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/fonts/space_grotesk.ttf') format('truetype');
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/inter.ttf') format('truetype');
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/jetbrains_mono.ttf') format('truetype');
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    --obsidian-black: #090A0D;
+    --obsidian-surface: #12141A;
+    --obsidian-elevated: #1A1D26;
+    --obsidian-glass: rgba(16, 18, 24, 0.70);
+    --titanium-white: #F6F7F9;
+    --silver-secondary: #B4BAC6;
+    --silver-muted: #7D8594;
+    --optical-cyan: #67E8F9;
+    --pro-amber: #F59E0B;
+    --capture-emerald: #34D399;
+    --error-coral: #F87171;
+    --cinema-crimson: #FF3B30;
+    --hairline-light: rgba(255, 255, 255, 0.15);
+    --hairline-subtle: rgba(255, 255, 255, 0.08);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: #090A0D;
+    color: #F6F7F9;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+}
+
+.font-display {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+}
+
+.font-mono-tech {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom Range Input styling matching Obsidian/OpticalCyan/ProAmber sliders */
+input[type='range'].ultra-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type='range'].ultra-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 9999px;
+}
+
+input[type='range'].ultra-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #F6F7F9;
+  border: 2px solid #090A0D;
+  margin-top: -6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+input[type='range'].ultra-slider-amber::-webkit-slider-thumb {
+  background: #F59E0B;
+}

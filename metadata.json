@@ -1,0 +1,6 @@
+{
+  "name": "Ultra Cam Pro",
+  "description": "Premium native Android camera app using CameraX for maximum sensor resolution and quality.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
