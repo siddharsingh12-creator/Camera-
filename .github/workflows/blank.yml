@@ -74,7 +74,7 @@ jobs:
           fi
 
       - name: Cache npm and Gradle dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.npm
