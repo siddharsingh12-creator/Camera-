@@ -5,6 +5,7 @@ import {
   Compass,
   Focus,
   Info,
+  Layers2,
   Lock,
   Moon,
   Palette,
@@ -32,6 +33,8 @@ function modeIcon(mode: PhotographyMode, className = 'h-3.5 w-3.5') {
       return <Moon className={className} />;
     case 'PORTRAIT':
       return <User className={className} />;
+    case 'DOUBLE_EXPOSURE':
+      return <Layers2 className={className} />;
     case 'MACRO':
       return <Focus className={className} />;
     case 'HIGH_RES':

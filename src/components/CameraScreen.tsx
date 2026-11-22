@@ -99,6 +99,7 @@ import {
   VideoSettingsDeck,
   VideoTorchButton,
 } from './VideoControlsPanel';
+import { DoubleExposureOverlay } from './DoubleExposureOverlay';
 
 export interface CameraScreenProps {
   uiState: CameraUiState;
@@ -175,6 +176,7 @@ export interface CameraScreenProps {
   onResetFilter: () => void;
   onToggleFilterPanel: () => void;
   onTogglePreserveOriginal: () => void;
+  onShareItem?: (item: CapturedPhotoInfo) => void;
 }
 
 export const CameraScreen: React.FC<CameraScreenProps> = ({
@@ -252,6 +254,7 @@ export const CameraScreen: React.FC<CameraScreenProps> = ({
   onResetFilter,
   onToggleFilterPanel,
   onTogglePreserveOriginal,
+  onShareItem,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const virtualCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -1100,6 +1103,70 @@ export const CameraScreen: React.FC<CameraScreenProps> = ({
       preferences.gcamEngine,
       isCompareOriginalHeld,
       encodeAndSaveCanvas,
+    ]
+  );
+
+  // Double Exposure Pro capture helper: runs 15-frame ZSL/Sabre Top Shot + GCam ProMax sharpness
+  const captureFrameForDoubleExposure = useCallback(
+    async (options: {
+      hdrPlus: boolean;
+      tag: string;
+      isPortrait?: boolean;
+    }): Promise<{ canvas: HTMLCanvasElement; report: GCamProcessReport | null } | null> => {
+      onTriggerShutterFlash();
+      const canvas = captureCurrentFrameToCanvas(true);
+      if (!canvas) {
+        onReportError('Camera preview unavailable yet. Try again once preview settles.');
+        return null;
+      }
+
+      const zslAuxFrames = options.hdrPlus
+        ? (zslRingRef.current?.getRecentFrames(2200) ?? [])
+        : [];
+      const tempBurstFrames: HTMLCanvasElement[] = [];
+
+      if (options.hdrPlus && !isLowPowerMode) {
+        for (let f = 0; f < 2; f++) {
+          await new Promise((r) => window.setTimeout(r, 16));
+          const extra = captureCurrentFrameToCanvas(true);
+          if (extra) tempBurstFrames.push(extra);
+        }
+      }
+
+      try {
+        const gcamReport = processGCamProMaxCanvas(
+          canvas,
+          [...tempBurstFrames, ...zslAuxFrames],
+          {
+            engine: {
+              ...preferences.gcamEngine,
+              hdrPlusMode: options.hdrPlus ? 'HDR_PLUS_ENHANCED' : 'OFF',
+              topShotSelection: true,
+              f17PortraitDepth: Boolean(
+                options.isPortrait && preferences.gcamEngine.f17PortraitDepth
+              ),
+            },
+            photographyMode: options.isPortrait ? 'PORTRAIT' : 'HDR',
+            isAutoWhiteBalance: uiState.manualSettings.whiteBalanceMode === 'AUTO',
+            isLowLightScene: uiState.detectedAutoScene === 'Low Light Scene',
+          }
+        );
+        return { canvas, report: gcamReport };
+      } finally {
+        tempBurstFrames.forEach((c) => {
+          c.width = 0;
+          c.height = 0;
+        });
+      }
+    },
+    [
+      captureCurrentFrameToCanvas,
+      isLowPowerMode,
+      onReportError,
+      onTriggerShutterFlash,
+      preferences.gcamEngine,
+      uiState.detectedAutoScene,
+      uiState.manualSettings.whiteBalanceMode,
     ]
   );
 
@@ -2790,6 +2857,56 @@ export const CameraScreen: React.FC<CameraScreenProps> = ({
             <GalleryIconButton onClick={onOpenGallery} />
           </div>
         </div>
+      )}
+
+      {/* Double Exposure Pro - GCam ProMax Edition Workspace */}
+      {uiState.captureDomain === 'PHOTO' && uiState.photographyMode === 'DOUBLE_EXPOSURE' && (
+        <DoubleExposureOverlay
+          liveStream={mediaStream}
+          isVirtualSensor={uiState.isVirtualSensor}
+          virtualCanvasRef={virtualCanvasRef}
+          isFrontCamera={isFrontCamera}
+          isFrontMirrorEnabled={uiState.isFrontMirrorEnabled}
+          flashSetting={uiState.flashSetting}
+          canSwitchCamera={uiState.hasBackCamera && uiState.hasFrontCamera}
+          isExposureLockEnabled={uiState.manualSettings.isExposureLockEnabled}
+          hdrPlusEnabled={preferences.gcamEngine.hdrPlusMode !== 'OFF'}
+          recentPhotos={uiState.capturedMedia}
+          captureFrameWithGCam={captureFrameForDoubleExposure}
+          onToggleFlash={onToggleFlash}
+          onSwitchCamera={onSwitchCamera}
+          onToggleExposureLock={(locked) => {
+            if (locked !== uiState.manualSettings.isExposureLockEnabled) {
+              onToggleExposureLock();
+            }
+          }}
+          onToggleHdrPlus={() =>
+            onUpdatePreferences((prev) => ({
+              ...prev,
+              gcamEngine: {
+                ...prev.gcamEngine,
+                hdrPlusMode:
+                  prev.gcamEngine.hdrPlusMode === 'OFF' ? 'HDR_PLUS_ENHANCED' : 'OFF',
+              },
+            }))
+          }
+          onSaveMergedMedia={async (item) => {
+            onMediaCaptured(item, false);
+          }}
+          onShareMedia={(item) => {
+            if (onShareItem) {
+              onShareItem(item);
+            } else {
+              const a = document.createElement('a');
+              a.href = item.url;
+              a.download = item.displayName;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+            }
+          }}
+          onExitMode={() => onSelectPhotographyMode('STANDARD')}
+        />
       )}
 
       {/* Photography Modes Detail Modal */}

@@ -390,6 +390,7 @@ export function evaluateModeCapabilities(profile: CameraHardwareProfile | null):
     else if (item.mode === 'HDR') backendLabel = 'Multi-Exposure Fusion';
     else if (item.mode === 'NIGHT') backendLabel = 'Night Frame Stack';
     else if (item.mode === 'PORTRAIT') backendLabel = 'Optical Depth Bokeh';
+    else if (item.mode === 'DOUBLE_EXPOSURE') backendLabel = 'GCam Silhouette Merge';
     else if (item.mode === 'MACRO') backendLabel = 'Close-Focus Optic';
     else if (item.mode === 'HIGH_RES') backendLabel = profile?.maxJpegResolution ? `${profile.maxJpegResolution.width}×${profile.maxJpegResolution.height}` : 'Native Sensor';
     else if (item.mode === 'PANORAMA') backendLabel = 'Sweep + Feather Stitch';

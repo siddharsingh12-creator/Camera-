@@ -1,0 +1,408 @@
+name: Build Ultra Cam Pro Android APK
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      build_mode:
+        description: 'APK build variant to output'
+        required: false
+        default: 'both'
+        type: choice
+        options:
+          - both
+          - release
+          - debug
+      version_name:
+        description: 'Optional override versionName (e.g. 1.0.0)'
+        required: false
+        default: '1.0.0'
+        type: string
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+  JAVA_VERSION: '21'
+  CAPACITOR_VERSION: '7'
+  APP_ID: 'com.ultracam.pro'
+  APP_NAME: 'Ultra Cam Pro'
+
+jobs:
+  build-apk:
+    name: Build Verified Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Java 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Cache npm and Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: android-apk-${{ runner.os }}-${{ hashFiles('package.json', 'bun.lock', 'package-lock.json') }}
+          restore-keys: |
+            android-apk-${{ runner.os }}-
+
+      - name: Install JavaScript dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --no-fund
+          else
+            npm install --no-audit --no-fund
+          fi
+
+      - name: Run TypeScript typecheck and Vite production build
+        run: |
+          npm run lint
+          npm run build
+          test -f dist/index.html
+
+      - name: Install Capacitor Android toolchain (CI workspace)
+        run: |
+          if [ ! -d "node_modules/@capacitor/android" ]; then
+            npm install --no-audit --no-fund \
+              "@capacitor/core@${CAPACITOR_VERSION}" \
+              "@capacitor/cli@${CAPACITOR_VERSION}" \
+              "@capacitor/android@${CAPACITOR_VERSION}"
+          fi
+
+      - name: Generate and sync Android native project
+        run: |
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+          npx cap sync android
+
+      - name: Harden AndroidManifest, WebView, Icons, and Performance Config
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: ${{ inputs.version_name || '1.0.0' }}
+        run: |
+          python3 - <<'PYEOF'
+          import os
+          import re
+          import shutil
+          import textwrap
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          root = Path('.')
+          android_dir = root / 'android'
+          app_dir = android_dir / 'app'
+          res_dir = app_dir / 'src' / 'main' / 'res'
+          manifest_path = app_dir / 'src' / 'main' / 'AndroidManifest.xml'
+
+          # 1. Harden Gradle performance & AndroidX configuration
+          gradle_props = android_dir / 'gradle.properties'
+          existing_props = gradle_props.read_text(encoding='utf-8') if gradle_props.exists() else ''
+          desired_props = {
+              'org.gradle.jvmargs': '-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8',
+              'org.gradle.parallel': 'true',
+              'org.gradle.caching': 'true',
+              'org.gradle.daemon': 'false',
+              'android.useAndroidX': 'true',
+              'android.enableJetifier': 'true',
+          }
+          prop_lines = [line for line in existing_props.splitlines() if line.strip()]
+          prop_map = {}
+          other_lines = []
+          for line in prop_lines:
+              if '=' in line and not line.lstrip().startswith('#'):
+                  k, v = line.split('=', 1)
+                  prop_map[k.strip()] = v.strip()
+              else:
+                  other_lines.append(line)
+          prop_map.update(desired_props)
+          new_props = '\n'.join(other_lines + [f'{k}={v}' for k, v in prop_map.items()]) + '\n'
+          gradle_props.write_text(new_props, encoding='utf-8')
+
+          # 2. Update versionCode / versionName cleanly in android/app/build.gradle
+          app_gradle = app_dir / 'build.gradle'
+          if app_gradle.exists():
+              gtxt = app_gradle.read_text(encoding='utf-8')
+              vcode = max(1, int(os.environ.get('VERSION_CODE', '1')))
+              vname = os.environ.get('VERSION_NAME', '1.0.0').strip() or '1.0.0'
+              gtxt = re.sub(r'versionCode\s+\d+', f'versionCode {vcode}', gtxt)
+              gtxt = re.sub(r'versionName\s+"[^"]*"', f'versionName "{vname}"', gtxt)
+              app_gradle.write_text(gtxt, encoding='utf-8')
+
+          # 3. Harden AndroidManifest.xml (Camera, Mic, Media, Hardware Acceleration, LargeHeap, Rotation Guard)
+          ANDROID_NS = 'http://schemas.android.com/apk/res/android'
+          ET.register_namespace('android', ANDROID_NS)
+          tree = ET.parse(manifest_path)
+          mroot = tree.getroot()
+
+          required_permissions = [
+              ('android.permission.INTERNET', {}),
+              ('android.permission.CAMERA', {}),
+              ('android.permission.RECORD_AUDIO', {}),
+              ('android.permission.MODIFY_AUDIO_SETTINGS', {}),
+              ('android.permission.READ_MEDIA_IMAGES', {}),
+              ('android.permission.READ_MEDIA_VIDEO', {}),
+              ('android.permission.READ_EXTERNAL_STORAGE', {f'{{{ANDROID_NS}}}maxSdkVersion': '32'}),
+              ('android.permission.WRITE_EXTERNAL_STORAGE', {f'{{{ANDROID_NS}}}maxSdkVersion': '29'}),
+          ]
+          existing_perms = {
+              el.attrib.get(f'{{{ANDROID_NS}}}name')
+              for el in mroot.findall('uses-permission')
+          }
+          for perm, extra_attrs in required_permissions:
+              if perm not in existing_perms:
+                  attrs = {f'{{{ANDROID_NS}}}name': perm, **extra_attrs}
+                  ET.SubElement(mroot, 'uses-permission', attrs)
+
+          required_features = [
+              'android.hardware.camera',
+              'android.hardware.camera.any',
+              'android.hardware.camera.autofocus',
+              'android.hardware.microphone',
+          ]
+          existing_features = {
+              el.attrib.get(f'{{{ANDROID_NS}}}name')
+              for el in mroot.findall('uses-feature')
+          }
+          for feat in required_features:
+              if feat not in existing_features:
+                  ET.SubElement(mroot, 'uses-feature', {
+                      f'{{{ANDROID_NS}}}name': feat,
+                      f'{{{ANDROID_NS}}}required': 'false',
+                  })
+
+          app_el = mroot.find('application')
+          if app_el is not None:
+              app_el.set(f'{{{ANDROID_NS}}}hardwareAccelerated', 'true')
+              app_el.set(f'{{{ANDROID_NS}}}largeHeap', 'true')
+              app_el.set(f'{{{ANDROID_NS}}}usesCleartextTraffic', 'false')
+              for act in app_el.findall('activity'):
+                  act.set(
+                      f'{{{ANDROID_NS}}}configChanges',
+                      'orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation',
+                  )
+                  act.set(f'{{{ANDROID_NS}}}windowSoftInputMode', 'adjustResize')
+                  act.set(f'{{{ANDROID_NS}}}exported', 'true')
+
+          tree.write(manifest_path, encoding='utf-8', xml_declaration=True)
+
+          # 4. Apply dark OLED theme (#090A0D) to prevent white flash on launch
+          values_dir = res_dir / 'values'
+          values_dir.mkdir(parents=True, exist_ok=True)
+          colors_xml = values_dir / 'colors.xml'
+          colors_xml.write_text(
+              '<?xml version="1.0" encoding="utf-8"?>\n'
+              '<resources>\n'
+              '    <color name="colorPrimary">#090A0D</color>\n'
+              '    <color name="colorPrimaryDark">#090A0D</color>\n'
+              '    <color name="colorAccent">#67E8F9</color>\n'
+              '    <color name="ic_launcher_background">#090A0D</color>\n'
+              '</resources>\n',
+              encoding='utf-8',
+          )
+
+          # 5. Generate Ultra Cam Pro launcher icons from public/ic_launcher.png if Pillow is installed
+          src_icon = root / 'public' / 'ic_launcher.png'
+          if src_icon.exists():
+              try:
+                  from PIL import Image
+                  sizes = {
+                      'mipmap-mdpi': 48,
+                      'mipmap-hdpi': 72,
+                      'mipmap-xhdpi': 96,
+                      'mipmap-xxhdpi': 144,
+                      'mipmap-xxxhdpi': 192,
+                  }
+                  base_img = Image.open(src_icon).convert('RGBA')
+                  for folder, px in sizes.items():
+                      mdir = res_dir / folder
+                      mdir.mkdir(parents=True, exist_ok=True)
+                      resized = base_img.resize((px, px), Image.Resampling.LANCZOS)
+                      resized.save(mdir / 'ic_launcher.png', format='PNG')
+                      resized.save(mdir / 'ic_launcher_round.png', format='PNG')
+                      fg = base_img.resize((px * 2, px * 2), Image.Resampling.LANCZOS)
+                      fg.save(mdir / 'ic_launcher_foreground.png', format='PNG')
+                  anydpi = res_dir / 'mipmap-anydpi-v26'
+                  if anydpi.exists():
+                      shutil.rmtree(anydpi)
+                  print('Generated Ultra Cam Pro launcher icons successfully.')
+              except ImportError:
+                  print('Pillow not installed; keeping default launcher icons.')
+
+          # 6. Harden MainActivity.java for zero-glitch WebView media/camera playback & dark surface
+          java_root = app_dir / 'src' / 'main' / 'java'
+          for main_act in java_root.rglob('MainActivity.java'):
+              pkg_line = 'package com.ultracam.pro;'
+              for line in main_act.read_text(encoding='utf-8').splitlines():
+                  if line.strip().startswith('package '):
+                      pkg_line = line.strip()
+                      break
+              java_code = textwrap.dedent(f"""\
+                  {pkg_line}
+
+                  import android.graphics.Color;
+                  import android.os.Bundle;
+                  import android.webkit.WebSettings;
+                  import android.webkit.WebView;
+                  import com.getcapacitor.BridgeActivity;
+
+                  public class MainActivity extends BridgeActivity {{
+                      @Override
+                      public void onCreate(Bundle savedInstanceState) {{
+                          super.onCreate(savedInstanceState);
+                          configureUltraCamWebView();
+                      }}
+
+                      @Override
+                      public void onStart() {{
+                          super.onStart();
+                          configureUltraCamWebView();
+                      }}
+
+                      private void configureUltraCamWebView() {{
+                          if (getBridge() == null) return;
+                          WebView wv = getBridge().getWebView();
+                          if (wv == null) return;
+                          wv.setBackgroundColor(Color.parseColor("#090A0D"));
+                          WebSettings settings = wv.getSettings();
+                          settings.setJavaScriptEnabled(true);
+                          settings.setDomStorageEnabled(true);
+                          settings.setDatabaseEnabled(true);
+                          settings.setMediaPlaybackRequiresUserGesture(false);
+                          settings.setAllowFileAccess(false);
+                      }}
+                  }}
+              """)
+              main_act.write_text(java_code, encoding='utf-8')
+              print(f'Hardened {main_act}')
+          PYEOF
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x android/gradlew
+
+      - name: Build Debug APK
+        if: inputs.build_mode == 'both' || inputs.build_mode == 'debug' || inputs.build_mode == ''
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Build Release APK
+        if: inputs.build_mode == 'both' || inputs.build_mode == 'release' || inputs.build_mode == ''
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Zipalign and Sign Release APK (Install-Ready)
+        if: inputs.build_mode == 'both' || inputs.build_mode == 'release' || inputs.build_mode == ''
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          mkdir -p build-outputs
+          BUILD_TOOLS_DIR=$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 2>/dev/null | sort -V | tail -n 1 || true)
+          if [ -z "$BUILD_TOOLS_DIR" ]; then
+            sdkmanager "build-tools;35.0.0"
+            BUILD_TOOLS_DIR="$ANDROID_HOME/build-tools/35.0.0"
+          fi
+          ZIPALIGN="$BUILD_TOOLS_DIR/zipalign"
+          APKSIGNER="$BUILD_TOOLS_DIR/apksigner"
+
+          RAW_RELEASE=$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)
+          test -n "$RAW_RELEASE"
+
+          KEYSTORE_PATH="$RUNNER_TEMP/release-signing.keystore"
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+            KS_PASS="$ANDROID_KEYSTORE_PASSWORD"
+            KEY_ALIAS="$ANDROID_KEY_ALIAS"
+            KEY_PASS="${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}"
+          else
+            KS_PASS="ultracampro-ci-sign"
+            KEY_ALIAS="ultracampro"
+            KEY_PASS="ultracampro-ci-sign"
+            keytool -genkeypair -v \
+              -keystore "$KEYSTORE_PATH" \
+              -storetype PKCS12 \
+              -alias "$KEY_ALIAS" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass "$KS_PASS" \
+              -keypass "$KEY_PASS" \
+              -dname "CN=Ultra Cam Pro, OU=Mobile, O=UltraCamPro, L=San Francisco, ST=CA, C=US"
+          fi
+
+          ALIGNED_APK="$RUNNER_TEMP/app-release-aligned.apk"
+          SIGNED_APK="build-outputs/UltraCamPro-release-signed.apk"
+
+          "$ZIPALIGN" -p -f -v 4 "$RAW_RELEASE" "$ALIGNED_APK" >/dev/null
+          "$APKSIGNER" sign \
+            --ks "$KEYSTORE_PATH" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass "pass:$KS_PASS" \
+            --key-pass "pass:$KEY_PASS" \
+            --out "$SIGNED_APK" \
+            "$ALIGNED_APK"
+
+          "$APKSIGNER" verify --verbose "$SIGNED_APK"
+          rm -f "$KEYSTORE_PATH" "$ALIGNED_APK"
+
+      - name: Collect Debug APK and Verify Output Artifacts
+        run: |
+          mkdir -p build-outputs
+          DEBUG_APK=$(find android/app/build/outputs/apk/debug -name '*.apk' 2>/dev/null | head -n 1 || true)
+          if [ -n "$DEBUG_APK" ]; then
+            cp "$DEBUG_APK" build-outputs/UltraCamPro-debug.apk
+          fi
+
+          echo "### Ultra Cam Pro APK Build Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Artifact | Size | SHA-256 |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| --- | --- | --- |" >> "$GITHUB_STEP_SUMMARY"
+          for apk in build-outputs/*.apk; do
+            [ -f "$apk" ] || continue
+            SIZE=$(du -h "$apk" | cut -f1)
+            HASH=$(sha256sum "$apk" | cut -d' ' -f1)
+            NAME=$(basename "$apk")
+            echo "| \`$NAME\` | $SIZE | \`$HASH\` |" >> "$GITHUB_STEP_SUMMARY"
+          done
+          ls -lh build-outputs/
+
+      - name: Upload Signed Release & Debug APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: UltraCamPro-APKs
+          path: build-outputs/*.apk
+          if-no-files-found: error
+          retention-days: 30

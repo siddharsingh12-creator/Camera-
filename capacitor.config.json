@@ -1,0 +1,15 @@
+{
+  "appId": "com.ultracam.pro",
+  "appName": "Ultra Cam Pro",
+  "webDir": "dist",
+  "backgroundColor": "#090A0D",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#090A0D",
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  }
+}

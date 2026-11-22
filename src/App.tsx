@@ -1612,6 +1612,7 @@ export function App() {
             preserveOriginalOnFilteredCapture: !prev.preserveOriginalOnFilteredCapture,
           }))
         }
+        onShareItem={(item) => void handleShareItem(item)}
       />
 
       {/* Hardware Capabilities Inspector Overlay */}

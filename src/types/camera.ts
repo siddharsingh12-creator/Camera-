@@ -366,6 +366,7 @@ export type PhotographyMode =
   | 'HDR'
   | 'NIGHT'
   | 'PORTRAIT'
+  | 'DOUBLE_EXPOSURE'
   | 'MACRO'
   | 'HIGH_RES'
   | 'PANORAMA'
@@ -383,6 +384,7 @@ export const PHOTOGRAPHY_MODE_LIST: {
   { mode: 'HDR', label: 'HDR', shortTag: 'HDR', description: 'Multi-exposure high dynamic range tone fusion' },
   { mode: 'NIGHT', label: 'Night', shortTag: 'NIGHT', description: 'Multi-frame night computational exposure boost' },
   { mode: 'PORTRAIT', label: 'Portrait', shortTag: 'PORTRAIT', description: 'Optical depth bokeh with natural skin texture preservation' },
+  { mode: 'DOUBLE_EXPOSURE', label: 'Double Exposure Pro', shortTag: 'DBL EXP', description: 'GCam ProMax sharp-face portrait & silhouette scene double exposure' },
   { mode: 'MACRO', label: 'Macro', shortTag: 'MACRO', description: 'Dedicated macro sensor or close-focus magnification' },
   { mode: 'HIGH_RES', label: 'Hi-Res', shortTag: 'HI-RES', description: 'Unbinned highest native sensor megapixel stream' },
   { mode: 'PANORAMA', label: 'Panorama', shortTag: 'PANO', description: 'Guided multi-frame sweep with feather seam stitching' },
